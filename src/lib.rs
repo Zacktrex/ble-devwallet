@@ -7,3 +7,5 @@ pub(crate) mod fmt;
 
 #[cfg(feature = "security")]
 pub mod ble;
+
+pub mod display;

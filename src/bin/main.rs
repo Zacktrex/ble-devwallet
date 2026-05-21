@@ -30,18 +30,7 @@ use esp_hal::{
 use esp_hal::gpio::InputConfig;
 use esp_hal::gpio::OutputConfig;
 
-use embedded_graphics::{
-    mono_font::{MonoTextStyle, ascii::FONT_6X10},
-    prelude::*,
-    text::Text,
-};
-use epd_waveshare::{
-    epd1in54_v2::Epd1in54,
-    graphics::Display,
-    prelude::*,
-};
-use epd_waveshare::color::Color;
-use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
+use ble_devwallet::display;
 
 extern crate alloc;
 
@@ -102,38 +91,17 @@ async fn main(_spawner: Spawner) -> ! {
         .with_mosi(peripherals.GPIO7);
 
     let cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
+
     let dc = Output::new(peripherals.GPIO4, Level::Low, OutputConfig::default());
+
     let rst = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
+
     let busy = Input::new(
         peripherals.GPIO3,
         InputConfig::default().with_pull(Pull::None),
     );
 
-    let mut delay = esp_hal::delay::Delay::new();
-
-    // Initialize E-paper display with SpiDevice wrapper
-    let mut spi_device = ExclusiveDevice::new(spi, cs, NoDelay).unwrap();
-    let mut epd = Epd1in54::new(&mut spi_device, busy, dc, rst, &mut delay, None).unwrap();
-
-    // Create display buffer (200x200 for 1.54" display)
-    let mut display = Display::<200, 200, false, 5000, Color>::default();
-    display.clear(Color::White).unwrap();
-
-    // Draw text
-    let style = MonoTextStyle::new(&FONT_6X10, Color::Black);
-    Text::new("ESP32-C3", Point::new(10, 20), style)
-        .draw(&mut display)
-        .unwrap();
-    Text::new("BLE Device", Point::new(10, 40), style)
-        .draw(&mut display)
-        .unwrap();
-    Text::new("Wallet", Point::new(10, 60), style)
-        .draw(&mut display)
-        .unwrap();
-
-    // Update display
-    epd.update_frame(&mut spi_device, display.buffer(), &mut delay).unwrap();
-    epd.display_frame(&mut spi_device, &mut delay).unwrap();
+    display::init_display(spi, cs, dc, rst, busy);
 
     info!("E-paper display initialized");
 
