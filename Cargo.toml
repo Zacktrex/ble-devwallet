@@ -63,6 +63,9 @@ embassy-embedded-hal = "0.6.0"
 embedded-storage = "0.3.1"
 esp-backtrace = { version = "0.18.1", features = [ "panic-handler", "println" ] }
 log = { version = "0.4", optional = true }
+embedded-graphics = "0.8.2"
+epd-waveshare = "0.6.0"
+embedded-hal-bus = "0.3.0"
 
 
 

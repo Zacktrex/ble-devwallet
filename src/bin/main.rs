@@ -8,7 +8,7 @@
 #![deny(clippy::large_stack_frames)]
 
 use bt_hci::controller::ExternalController;
-use defmt::{info};
+use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
@@ -22,13 +22,33 @@ use {esp_alloc as _, esp_backtrace as _};
 
 use ble_devwallet::ble;
 
+use esp_hal::{
+    gpio::{Input, Level, Output, Pull},
+    spi::master::{Config as SpiConfig, Spi},
+};
+
+use esp_hal::gpio::InputConfig;
+use esp_hal::gpio::OutputConfig;
+
+use embedded_graphics::{
+    mono_font::{MonoTextStyle, ascii::FONT_6X10},
+    prelude::*,
+    text::Text,
+};
+use epd_waveshare::{
+    epd1in54_v2::Epd1in54,
+    graphics::Display,
+    prelude::*,
+};
+use epd_waveshare::color::Color;
+use embedded_hal_bus::spi::{ExclusiveDevice, NoDelay};
+
 extern crate alloc;
 
 // #[panic_handler]
 // fn panic(_: &core::panic::PanicInfo) -> ! {
 //     loop {}
 // }
-
 
 // const CONNECTIONS_MAX: usize = 1;
 // const L2CAP_CHANNELS_MAX: usize = 1;
@@ -75,6 +95,47 @@ async fn main(_spawner: Spawner) -> ! {
     let capacity = flash_storage.capacity() as u32;
     let storage_range = (capacity - erase_size * 2)..capacity;
     let mut flash = embassy_embedded_hal::adapter::BlockingAsync::new(flash_storage);
+
+    let spi = Spi::new(peripherals.SPI2, SpiConfig::default())
+        .unwrap()
+        .with_sck(peripherals.GPIO6)
+        .with_mosi(peripherals.GPIO7);
+
+    let cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
+    let dc = Output::new(peripherals.GPIO4, Level::Low, OutputConfig::default());
+    let rst = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
+    let busy = Input::new(
+        peripherals.GPIO3,
+        InputConfig::default().with_pull(Pull::None),
+    );
+
+    let mut delay = esp_hal::delay::Delay::new();
+
+    // Initialize E-paper display with SpiDevice wrapper
+    let mut spi_device = ExclusiveDevice::new(spi, cs, NoDelay).unwrap();
+    let mut epd = Epd1in54::new(&mut spi_device, busy, dc, rst, &mut delay, None).unwrap();
+
+    // Create display buffer (200x200 for 1.54" display)
+    let mut display = Display::<200, 200, false, 5000, Color>::default();
+    display.clear(Color::White).unwrap();
+
+    // Draw text
+    let style = MonoTextStyle::new(&FONT_6X10, Color::Black);
+    Text::new("ESP32-C3", Point::new(10, 20), style)
+        .draw(&mut display)
+        .unwrap();
+    Text::new("BLE Device", Point::new(10, 40), style)
+        .draw(&mut display)
+        .unwrap();
+    Text::new("Wallet", Point::new(10, 60), style)
+        .draw(&mut display)
+        .unwrap();
+
+    // Update display
+    epd.update_frame(&mut spi_device, display.buffer(), &mut delay).unwrap();
+    epd.display_frame(&mut spi_device, &mut delay).unwrap();
+
+    info!("E-paper display initialized");
 
     ble::run(ble_controller, &mut trng, &mut flash, storage_range).await;
 
