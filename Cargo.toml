@@ -1,34 +1,19 @@
 [package]
-edition      = "2024"
-name         = "ble-devwallet"
+edition = "2024"
+name = "ble-devwallet"
 rust-version = "1.88"
-version      = "0.1.0"
+version = "0.1.0"
 
 [[bin]]
 name = "ble-devwallet"
 path = "./src/bin/main.rs"
 
 [dependencies]
-esp-hal = { version = "~1.1.0", features = ["defmt", "esp32c3", "unstable"] }
-
-esp-rtos = { version = "0.3.0", features = [
-  "defmt",
-  "embassy",
-  "esp-alloc",
-  "esp-radio",
-  "esp32c3",
-] }
-
-defmt                  = "1.0.1"
-esp-bootloader-esp-idf = { version = "0.5.0", features = ["defmt", "esp32c3"] }
-
-bt-hci = "0.8.0"
 embassy-executor = { version = "0.10.0", features = ["defmt"] }
-embassy-time = { version = "0.5.0", features = ["defmt"] }
-embedded-io = { version = "0.7.1", features = ["defmt"] }
-embedded-io-async = { version = "0.7.0", features = ["defmt"] }
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["defmt", "esp32c3"] }
+esp-hal = { version = "~1.1.0", features = ["defmt", "esp32c3", "unstable"] }
 esp-alloc = { version = "0.10.0", features = ["defmt"] }
-esp-println = { version = "0.17.0", features = ["defmt-espflash", "esp32c3"] }
+esp-println = { version = "0.16.0", features = ["defmt-espflash", "esp32c3","log-04"] }
 esp-radio = { version = "0.18.0", features = [
   "ble",
   "defmt",
@@ -36,10 +21,50 @@ esp-radio = { version = "0.18.0", features = [
   "esp32c3",
   "unstable",
 ] }
-trouble-host = { version = "0.6.0", features = ["gatt"] }
+esp-rtos = { version = "0.3.0", features = [
+  "defmt",
+  "embassy",
+  "esp-alloc",
+  "esp-radio",
+  "esp32c3",
+] }
+trouble-host = { git = "https://github.com/embassy-rs/trouble", features = [
+  "derive",
+  "scan",
+  "gatt",
+  "default-packet-pool-mtu-255",
+] }
+bt-hci = { version = "0.8.0", features = ["defmt"] }
+esp-storage = { version = "0.9", features = [ "esp32c3"] }
+embassy-time = { version = "0.5.0", features = ["defmt"] }
+embedded-io = { version = "0.7.1", features = ["defmt"] }
+embedded-io-async = { version = "0.7.0", features = ["defmt"] }
+
+embassy-futures = "0.1.1"
+embassy-sync = { version = "0.8" }
+embedded-hal-async = "1.0"
+static_cell = "2"
+heapless = "0.9"
+rand_core = { version = "0.6", default-features = false }
+
+# Used by 'security' feature
+embedded-storage-async = { version = "0.4.1", optional = true }
+sequential-storage = { version = "7.1.0", optional = true, features = [
+  "postcard",
+] }
+
+defmt = { version = "1.0.1",optional = true}
+serde = { version = "1.0.228", default-features = false, features = [
+  "derive",
+], optional = true }
 
 critical-section = "1.2.0"
-static_cell      = "2.1.1"
+embassy-embedded-hal = "0.6.0"
+embedded-storage = "0.3.1"
+esp-backtrace = { version = "0.18.1", features = [ "panic-handler", "println" ] }
+log = { version = "0.4", optional = true }
+
+
 
 
 # For fine tuning these settings, please refer to https://doc.rust-lang.org/cargo/reference/profiles.html
@@ -49,7 +74,37 @@ static_cell      = "2.1.1"
 opt-level = "s"
 
 [profile.release]
-codegen-units = 1     # LLVM can perform better optimizations using a single thread
-debug         = 2     # prefer slower builds but better debugging experience
-lto           = 'fat'
-opt-level     = 's'
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2         # prefer slower builds but better debugging experience
+lto = 'fat'
+opt-level = 's'
+
+
+[features]
+default = ["esp32c3"]
+esp32c3 = [
+  "esp-hal/esp32c3",
+  "esp-backtrace/esp32c3",
+  "esp-println/esp32c3",
+  "esp-radio/esp32c3",
+  "esp-rtos/esp32c3",
+  "esp-storage/esp32c3",
+  "esp-bootloader-esp-idf/esp32c3",
+]
+
+defmt = [
+  "dep:defmt",
+   "trouble-host/defmt", "bt-hci/defmt"]
+log = [
+  "dep:log",
+  "trouble-host/log",
+  "bt-hci/log",
+]
+security = [
+  "trouble-host/security",
+  "dep:sequential-storage",
+  "dep:embedded-storage-async",
+  "trouble-host/serde",
+  "dep:serde",
+]
+std = []

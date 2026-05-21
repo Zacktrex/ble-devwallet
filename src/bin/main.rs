@@ -8,25 +8,24 @@
 #![deny(clippy::large_stack_frames)]
 
 use bt_hci::controller::ExternalController;
-use defmt::{error, info};
+// use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
+use esp_hal::rng::{Trng, TrngSource};
 use esp_hal::timer::timg::TimerGroup;
-use esp_println as _;
+// use esp_println as _;
 use esp_radio::ble::controller::BleConnector;
-use trouble_host::prelude::*;
+use esp_storage::FlashStorage;
+// use trouble_host::prelude::*;
+use {esp_alloc as _, esp_backtrace as _};
 
-#[panic_handler]
-fn panic(panic_info: &core::panic::PanicInfo) -> ! {
-    error!("{}", panic_info);
-    loop {}
-}
+use ble_devwallet::ble;
 
 extern crate alloc;
 
-const CONNECTIONS_MAX: usize = 1;
-const L2CAP_CHANNELS_MAX: usize = 1;
+// const CONNECTIONS_MAX: usize = 1;
+// const L2CAP_CHANNELS_MAX: usize = 1;
 
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
@@ -37,7 +36,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
     reason = "it's not unusual to allocate larger buffers etc. in main"
 )]
 #[esp_rtos::main]
-async fn main(spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) -> ! {
+    esp_println::logger::init_logger_from_env();
     // generator version: 1.3.0
     // generator parameters: --chip esp32c3 -o unstable-hal -o alloc -o embassy -o ble-trouble -o defmt -o ci -o wokwi -o vscode
 
@@ -51,20 +51,32 @@ async fn main(spawner: Spawner) -> ! {
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    info!("Embassy initialized!");
+    let _trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1);
+    let mut trng = Trng::try_new().unwrap();
+
+    // info!("Embassy initialized!");
 
     // find more examples https://github.com/embassy-rs/trouble/tree/main/examples/esp32
     let transport = BleConnector::new(peripherals.BT, Default::default()).unwrap();
     let ble_controller = ExternalController::<_, 1>::new(transport);
-    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
-        HostResources::new();
-    let _stack = trouble_host::new(ble_controller, &mut resources);
+    // let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+    //     HostResources::new();
+    // let _stack = trouble_host::new(ble_controller, &mut resources);
+
+    let flash_storage = FlashStorage::new(peripherals.FLASH);
+    use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
+    let erase_size = <FlashStorage as NorFlash>::ERASE_SIZE as u32;
+    let capacity = flash_storage.capacity() as u32;
+    let storage_range = (capacity - erase_size * 2)..capacity;
+    let mut flash = embassy_embedded_hal::adapter::BlockingAsync::new(flash_storage);
+
+    ble::run(ble_controller, &mut trng, &mut flash, storage_range).await;
 
     // TODO: Spawn some tasks
-    let _ = spawner;
+    // let _ = spawner;
 
     loop {
-        info!("Hello world!");
+        // info!("Hello world!");
         Timer::after(Duration::from_secs(1)).await;
     }
 
