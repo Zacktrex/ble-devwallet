@@ -37,7 +37,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 )]
 #[esp_rtos::main]
 async fn main(_spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
+    // esp_println::logger::init_logger_from_env();
     // generator version: 1.3.0
     // generator parameters: --chip esp32c3 -o unstable-hal -o alloc -o embassy -o ble-trouble -o defmt -o ci -o wokwi -o vscode
 
