@@ -17,10 +17,26 @@ const CONNECTIONS_MAX: usize = 1;
 const L2CAP_CHANNELS_MAX: usize = 4; // Signal + att
 
 // GATT Server definition
+// #[gatt_server]
+// struct Server {
+//     battery_service: BatteryService,
+//     hid_service: HidService,
+// }
+
+// GATT Server definition
 #[gatt_server]
 struct Server {
-    battery_service: BatteryService,
-    hid_service: HidService,
+    sensor_service: SensorService,
+}
+
+/// Battery service
+#[gatt_service(uuid = "a9c81b72-0f7a-4c59-b0a8-425e3bcf0a0e")]
+struct SensorService {
+    #[characteristic(uuid = "13c0ef83-09bd-4767-97cb-ee46224ae6db", read, notify)]
+    sensor_data: u8,
+
+    #[characteristic(uuid = "c79b2ca7-f39d-4060-8168-816fa26737b7", write, read)]
+    sensor_settings: bool,
 }
 
 static DESC: [u8; 67] = [
@@ -62,16 +78,16 @@ pub(crate) struct HidService {
 }
 
 /// Battery service
-#[gatt_service(uuid = service::BATTERY)]
-struct BatteryService {
-    /// Battery Level
-    #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
-    #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level", type = &'static str)]
-    #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10, permissions(encrypted))]
-    level: u8,
-    #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
-    status: bool,
-}
+// #[gatt_service(uuid = service::BATTERY)]
+// struct BatteryService {
+//     /// Battery Level
+//     #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
+//     #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level", type = &'static str)]
+//     #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10, permissions(encrypted))]
+//     level: u8,
+//     #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
+//     status: bool,
+// }
 
 #[derive(Serialize, Deserialize)]
 struct StoredBondInformation(BondInformation);
@@ -190,7 +206,7 @@ async fn gatt_events_task<S: NorFlash>(
     conn: &GattConnection<'_, '_, DefaultPacketPool>,
     bond_stored: &mut bool,
 ) -> Result<(), Error> {
-    let level = server.battery_service.level;
+    let level = server.sensor_service.sensor_data;
     let reason = loop {
         match conn.next().await {
             GattConnectionEvent::Disconnected { reason } => break reason,
@@ -295,7 +311,7 @@ async fn custom_task<C: Controller, P: PacketPool>(
     stack: &Stack<'_, C, P>,
 ) {
     let mut tick: u8 = 0;
-    let level = server.battery_service.level;
+    let level = server.sensor_service.sensor_data;
     loop {
         tick = tick.wrapping_add(1);
         info!("[custom_task] notifying connection of tick {}", tick);

@@ -8,7 +8,7 @@
 #![deny(clippy::large_stack_frames)]
 
 use bt_hci::controller::ExternalController;
-// use defmt::{error, info};
+use defmt::{info};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
@@ -23,6 +23,12 @@ use {esp_alloc as _, esp_backtrace as _};
 use ble_devwallet::ble;
 
 extern crate alloc;
+
+// #[panic_handler]
+// fn panic(_: &core::panic::PanicInfo) -> ! {
+//     loop {}
+// }
+
 
 // const CONNECTIONS_MAX: usize = 1;
 // const L2CAP_CHANNELS_MAX: usize = 1;
@@ -54,7 +60,7 @@ async fn main(_spawner: Spawner) -> ! {
     let _trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1);
     let mut trng = Trng::try_new().unwrap();
 
-    // info!("Embassy initialized!");
+    info!("Embassy initialized!");
 
     // find more examples https://github.com/embassy-rs/trouble/tree/main/examples/esp32
     let transport = BleConnector::new(peripherals.BT, Default::default()).unwrap();
@@ -76,7 +82,7 @@ async fn main(_spawner: Spawner) -> ! {
     // let _ = spawner;
 
     loop {
-        // info!("Hello world!");
+        info!("Hello world!");
         Timer::after(Duration::from_secs(1)).await;
     }
 
