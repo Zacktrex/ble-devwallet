@@ -17,27 +17,27 @@ const CONNECTIONS_MAX: usize = 1;
 const L2CAP_CHANNELS_MAX: usize = 4; // Signal + att
 
 // GATT Server definition
-// #[gatt_server]
-// struct Server {
-//     battery_service: BatteryService,
-//     hid_service: HidService,
-// }
-
-// GATT Server definition
 #[gatt_server]
 struct Server {
-    sensor_service: SensorService,
+    battery_service: BatteryService,
+    hid_service: HidService,
 }
 
-/// Battery service
-#[gatt_service(uuid = "a9c81b72-0f7a-4c59-b0a8-425e3bcf0a0e")]
-struct SensorService {
-    #[characteristic(uuid = "13c0ef83-09bd-4767-97cb-ee46224ae6db", read, notify)]
-    sensor_data: u8,
+// // GATT Server definition
+// #[gatt_server]
+// struct Server {
+//     sensor_service: SensorService,
+// }
 
-    #[characteristic(uuid = "c79b2ca7-f39d-4060-8168-816fa26737b7", write, read)]
-    sensor_settings: bool,
-}
+// /// Battery service
+// #[gatt_service(uuid = "a9c81b72-0f7a-4c59-b0a8-425e3bcf0a0e")]
+// struct SensorService {
+//     #[characteristic(uuid = "13c0ef83-09bd-4767-97cb-ee46224ae6db", read, notify)]
+//     sensor_data: u8,
+
+//     #[characteristic(uuid = "c79b2ca7-f39d-4060-8168-816fa26737b7", write, read)]
+//     sensor_settings: bool,
+// }
 
 static DESC: [u8; 67] = [
     5u8, 1u8, 9u8, 6u8, 161u8, 1u8, 5u8, 7u8, 25u8, 224u8, 41u8, 231u8, 21u8, 0u8, 37u8, 1u8,
@@ -77,17 +77,17 @@ pub(crate) struct HidService {
     pub(crate) output_keyboard: [u8; 1],
 }
 
-/// Battery service
-// #[gatt_service(uuid = service::BATTERY)]
-// struct BatteryService {
-//     /// Battery Level
-//     #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
-//     #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level", type = &'static str)]
-//     #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10, permissions(encrypted))]
-//     level: u8,
-//     #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
-//     status: bool,
-// }
+//Battery service
+#[gatt_service(uuid = service::BATTERY)]
+struct BatteryService {
+    /// Battery Level
+    #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
+    #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level", type = &'static str)]
+    #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10, permissions(encrypted))]
+    level: u8,
+    #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
+    status: bool,
+}
 
 #[derive(Serialize, Deserialize)]
 struct StoredBondInformation(BondInformation);
@@ -135,14 +135,14 @@ pub async fn run<C, RNG, S>(
 
     info!("Starting advertising and GATT service");
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
-        name: "devwallet",
+        name: "DevWallet",
         appearance: &appearance::human_interface_device::GENERIC_HUMAN_INTERFACE_DEVICE,
     }))
     .unwrap();
 
     let _ = join(ble_task(runner), async {
         loop {
-            match advertise("devwallet", &mut peripheral, &server).await {
+            match advertise("DevWallet", &mut peripheral, &server).await {
                 Ok(conn) => {
                     conn.raw().set_bondable(true).unwrap();
                     // set up tasks when the connection is established to a central, so they don't run when no one is connected.
@@ -206,7 +206,7 @@ async fn gatt_events_task<S: NorFlash>(
     conn: &GattConnection<'_, '_, DefaultPacketPool>,
     bond_stored: &mut bool,
 ) -> Result<(), Error> {
-    let level = server.sensor_service.sensor_data;
+    let level = server.battery_service.level;
     let reason = loop {
         match conn.next().await {
             GattConnectionEvent::Disconnected { reason } => break reason,
@@ -311,7 +311,7 @@ async fn custom_task<C: Controller, P: PacketPool>(
     stack: &Stack<'_, C, P>,
 ) {
     let mut tick: u8 = 0;
-    let level = server.sensor_service.sensor_data;
+    let level = server.battery_service.level;
     loop {
         tick = tick.wrapping_add(1);
         info!("[custom_task] notifying connection of tick {}", tick);
